@@ -83,7 +83,14 @@ jobs:
 
       - name: Run tests
         shell: bash
-        run: uv run pytest -v --tb=short --ignore=tests/test_heic_support.py
+        # On Windows, skip test_mcp_detection.py which spawns subprocess
+        # servers — Windows pipe buffering can deadlock on large output.
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            uv run pytest -v --tb=short --ignore=tests/test_heic_support.py --ignore=tests/test_mcp_detection.py
+          else
+            uv run pytest -v --tb=short --ignore=tests/test_heic_support.py
+          fi
 
       - name: Run HEIC tests
         if: matrix.os == 'macos-latest'
