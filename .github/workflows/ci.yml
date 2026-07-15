@@ -56,16 +56,16 @@ jobs:
 
       - name: Install system dependencies (Windows)
         if: matrix.os == 'windows-latest'
-        # tesseract is available via choco; pyzbar ships its own libzbar0
-        # bundled, so on Windows we don't need a separate zbar install.
-        # tesseract-ocr is portable — we install it to C:\tesseract and
-        # add it to PATH so pytesseract can find it.
+        # tesseract via choco; pyzbar bundles its own libzbar-0.dll.
+        # choco can fail transiently (504 from community feed) — tests
+        # skip OCR-dependent paths if tesseract isn't found.
         shell: pwsh
         run: |
-          choco install --no-progress tesseract --installargs 'ADDSTARTUPSEARCH=0 ADDLOCAL=ALL' -y
-          echo "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          # Verify
-          tesseract --version
+          choco install --no-progress tesseract -y 2>$null
+          "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          tesseract --version 2>$null
+          if ($LASTEXITCODE -ne 0) { Write-Host "tesseract install failed — OCR tests will skip" }
+        continue-on-error: true
 
       - name: Set up Python
         run: uv python install ${{ matrix.python-version }}
