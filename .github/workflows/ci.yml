@@ -51,6 +51,8 @@ jobs:
         run: |
           brew update
           brew install tesseract tesseract-lang zbar
+          # Help pyzbar find libzbar.dylib on Apple Silicon runners
+          echo "DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib:/usr/local/lib" >> "$GITHUB_ENV"
 
       - name: Install system dependencies (Windows)
         if: matrix.os == 'windows-latest'

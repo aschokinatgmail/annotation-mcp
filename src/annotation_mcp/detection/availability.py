@@ -98,10 +98,21 @@ def check_tesseract_languages(*required: str) -> tuple[bool, list[str]]:
 
 
 def check_zbar_library() -> DependencyStatus:
-    """Check if zbar shared library is present (required by pyzbar)."""
-    # pyzbar finds the library at import time, so the test is whether
-    # pyzbar can be imported successfully. We also probe the dylib path
-    # directly to give a clear install hint.
+    """Check if zbar shared library is present AND loadable by pyzbar.
+
+    On some platforms (especially macOS CI), the dylib file exists but
+    the dynamic linker can't find it at runtime. We verify both the
+    file existence AND that pyzbar can actually import and load it.
+    """
+    if importlib.util.find_spec("pyzbar") is None:
+        return DependencyStatus(
+            name="zbar",
+            available=False,
+            detail="pyzbar Python module not installed",
+            install_hint="Install with: pip install pyzbar",
+        )
+
+    found_path = None
     for candidate in (
         "/opt/homebrew/lib/libzbar.dylib",
         "/opt/homebrew/opt/zbar/lib/libzbar.dylib",
@@ -112,26 +123,27 @@ def check_zbar_library() -> DependencyStatus:
         "/usr/lib/x86_64-linux-gnu/libzbar.so.0",
     ):
         if _path_exists(candidate):
-            return DependencyStatus(
-                name="zbar",
-                available=True,
-                detail=f"found at {candidate}",
-            )
+            found_path = candidate
+            break
 
-    if importlib.util.find_spec("pyzbar") is None:
+    try:
+        from pyzbar.pyzbar import decode, ZBarSymbol  # noqa: F401
+    except Exception as e:
+        hint = "brew install zbar (macOS)"
+        if found_path:
+            hint += f" — library at {found_path} but import failed: {e}"
+        else:
+            hint += " or apt install libzbar0 (Linux)"
         return DependencyStatus(
             name="zbar",
             available=False,
-            detail="pyzbar Python module not installed",
-            install_hint="Install with: pip install pyzbar",
+            detail=f"pyzbar import failed: {e}",
+            install_hint=hint,
         )
 
-    return DependencyStatus(
-        name="zbar",
-        available=False,
-        detail="pyzbar installed but zbar shared library not found",
-        install_hint="Install with: brew install zbar (macOS) or apt install libzbar0 (Linux)",
-    )
+    if found_path:
+        return DependencyStatus(name="zbar", available=True, detail=f"loaded from {found_path}")
+    return DependencyStatus(name="zbar", available=True, detail="pyzbar importable")
 
 
 def check_opencv() -> DependencyStatus:
