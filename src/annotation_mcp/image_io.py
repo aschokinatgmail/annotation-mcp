@@ -150,6 +150,8 @@ def validate_input_path(path: str) -> str:
     if not p.is_absolute():
         msg = f"Input path must be absolute: {path}"
         raise ValueError(msg)
+    path = str(Path(path).resolve())
+    p = Path(path)
     if not p.exists():
         msg = f"Input file not found: {path}"
         raise FileNotFoundError(msg)
@@ -172,6 +174,8 @@ def validate_output_path(path: str) -> str:
     if not p.is_absolute():
         msg = f"Output path must be absolute: {path}"
         raise ValueError(msg)
+    path = str(Path(path).resolve())
+    p = Path(path)
     if not p.parent.exists():
         msg = f"Output directory does not exist: {p.parent}"
         raise ValueError(msg)

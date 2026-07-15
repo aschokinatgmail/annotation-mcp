@@ -135,7 +135,7 @@ def _preprocess_image(
     # Literal (without updating this function) fails loudly rather than
     # silently returning the unprocessed image.
     msg = f"Unknown preprocess mode: {mode!r}"
-    raise AssertionError(msg)
+    raise ValueError(msg)
 
 
 def _safe_str(value: object) -> str:
@@ -258,7 +258,7 @@ def detect_text_regions(  # noqa: C901, PLR0913
     # Fallback: if user didn't specify PSM and we got 0 regions, retry with
     # psm=6 (uniform block of text) which works for the majority of images
     # where the default page-segmentation mode silently returns nothing.
-    if psm is None and detail == "word":
+    if psm is None:
         if not _data_has_word_regions(data):
             try:
                 data = _run_ocr(
@@ -429,7 +429,9 @@ def _collapse_to_level(
         match target:
             case "line":
                 key = (page_num, block_num, par_num, line_num)
-            case "block" | "paragraph":
+            case "block":
+                key = (page_num, block_num, -1, -1)
+            case "paragraph":
                 key = (page_num, block_num, par_num, -1)
             case _:
                 key = (page_num, block_num, par_num, -1)

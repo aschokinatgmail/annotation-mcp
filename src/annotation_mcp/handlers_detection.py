@@ -48,6 +48,11 @@ def handle_detect_barcodes(
 ) -> CallToolResult:
     """Handle detect_barcodes tool call.
 
+    Note on confidence scale: barcode ``min_confidence`` uses a **0–1**
+    range (pyzbar quality). This differs from OCR text detection
+    (``handle_detect_text_regions``), which uses a **0–100** scale
+    (tesseract confidence). The scales are not interchangeable.
+
     Args:
         path: Absolute path to image file.
         min_confidence: Discard matches with confidence below this (0-1).
@@ -116,6 +121,11 @@ def handle_detect_text_regions(
     crop_output_dir: str | None = None,
 ) -> CallToolResult:
     """Handle detect_text_regions tool call.
+
+    Note on confidence scale: OCR ``min_confidence`` uses a **0–100**
+    range (tesseract confidence). This differs from barcode detection
+    (``handle_detect_barcodes``), which uses a **0–1** scale (pyzbar
+    quality). The scales are not interchangeable.
 
     Args:
         path: Absolute path to image file.

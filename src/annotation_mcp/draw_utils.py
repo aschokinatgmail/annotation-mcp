@@ -91,12 +91,22 @@ def composite_rect(
     """Draw a semi-transparent rectangle via alpha compositing.
 
     ImageDraw.rectangle with an RGBA fill replaces pixels instead of
-    blending. This helper creates an overlay and alpha-composites it,
-    producing correct semi-transparency.
+    blending. This helper creates an overlay at the rectangle size and
+    alpha-composites it, producing correct semi-transparency without
+    allocating a full-image-sized overlay.
+
+    For a 12MP image this avoids ~48MB of allocation per call.
     """
-    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    overlay_draw = ImageDraw.Draw(overlay)
-    overlay_draw.rectangle(xy, fill=fill)
-    composited = Image.alpha_composite(img.convert("RGBA"), overlay)
-    img.paste(composited, (0, 0))
+    x1 = int(round(xy[0]))
+    y1 = int(round(xy[1]))
+    x2 = int(round(xy[2]))
+    y2 = int(round(xy[3]))
+    rect_w = x2 - x1
+    rect_h = y2 - y1
+    if rect_w <= 0 or rect_h <= 0:
+        return
+    overlay = Image.new("RGBA", (rect_w, rect_h), fill)
+    region = img.crop((x1, y1, x2, y2)).convert("RGBA")
+    composited = Image.alpha_composite(region, overlay)
+    img.paste(composited, (x1, y1))
 

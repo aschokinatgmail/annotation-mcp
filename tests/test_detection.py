@@ -253,6 +253,23 @@ class TestDetectTextRegionsUnit:
         for m in matches:
             assert m.level == "block"
 
+    def test_block_has_fewer_regions_than_paragraph(self) -> None:
+        """Blocks group paragraphs together, so block count <= paragraph count.
+
+        If block_count > paragraph_count, the grouping logic is broken.
+        If both are 0, there's no data to compare and the test passes.
+        """
+        _require_text_fixture()
+        _require_tesseract()
+        _require_lang("eng")
+        block_matches = detect_text_regions(SYNTHETIC_TEXT, lang="eng", detail="block")
+        paragraph_matches = detect_text_regions(
+            SYNTHETIC_TEXT, lang="eng", detail="paragraph"
+        )
+        block_count = len(block_matches)
+        paragraph_count = len(paragraph_matches)
+        assert block_count <= paragraph_count
+
     def test_cyrillic_detection(self) -> None:
         _require_text_fixture()
         _require_tesseract()
@@ -366,12 +383,16 @@ class TestDetectTextRegionsUnit:
         draw.text((50, 80), "PSM TEST TEXT", fill="black", font=font)
         img.save(path)
 
-        # Run with default PSM (None) — should fall back to PSM=6 if needed
+        # Run with default PSM (None) — should fall back to PSM=6 if needed.
+        # filter_garbage=False isolates the PSM fallback from the garbage
+        # filter, which would otherwise strip short uppercase words like
+        # "PSM" and "TEXT".
         matches = detect_text_regions(
             str(path), lang="eng", detail="word", preprocess="none",
+            filter_garbage=False,
         )
         # Either default or fallback should find some text
-        assert isinstance(matches, list)
+        assert len(matches) > 0
 
     def test_filter_garbage_off_keeps_garbage(self) -> None:
         """filter_garbage=False passes through all regions including junk.

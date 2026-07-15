@@ -9,9 +9,11 @@ session, and the cost is negligible.
 """
 from __future__ import annotations
 
+import ctypes.util
 import importlib.util
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 
 
@@ -25,6 +27,16 @@ class DependencyStatus:
     install_hint: str | None = None
 
 
+def _tesseract_install_hint(action: str = "Install") -> str:
+    if sys.platform == "darwin":
+        return f"{action} with: brew install tesseract tesseract-lang"
+    if sys.platform == "linux":
+        return f"{action} with: apt install tesseract-ocr tesseract-ocr-{{lang}}"
+    if sys.platform == "win32":
+        return f"{action} with: choco install tesseract"
+    return f"{action} tesseract for your platform"
+
+
 def check_tesseract() -> DependencyStatus:
     """Check if tesseract binary is installed and get version + languages."""
     tesseract_path = shutil.which("tesseract")
@@ -33,7 +45,7 @@ def check_tesseract() -> DependencyStatus:
             name="tesseract",
             available=False,
             detail="tesseract binary not found on PATH",
-            install_hint="Install with: brew install tesseract tesseract-lang",
+            install_hint=_tesseract_install_hint(),
         )
 
     try:
@@ -49,7 +61,7 @@ def check_tesseract() -> DependencyStatus:
             name="tesseract",
             available=False,
             detail=f"tesseract failed to execute: {e}",
-            install_hint="Reinstall with: brew install tesseract tesseract-lang",
+            install_hint=_tesseract_install_hint("Reinstall"),
         )
 
     if result.returncode != 0:
@@ -57,7 +69,7 @@ def check_tesseract() -> DependencyStatus:
             name="tesseract",
             available=False,
             detail=f"tesseract --version returned {result.returncode}",
-            install_hint="Reinstall with: brew install tesseract tesseract-lang",
+            install_hint=_tesseract_install_hint("Reinstall"),
         )
 
     # Parse first line of stdout (e.g. "tesseract 5.5.2")
@@ -112,19 +124,22 @@ def check_zbar_library() -> DependencyStatus:
             install_hint="Install with: pip install pyzbar",
         )
 
-    found_path = None
-    for candidate in (
-        "/opt/homebrew/lib/libzbar.dylib",
-        "/opt/homebrew/opt/zbar/lib/libzbar.dylib",
-        "/usr/local/lib/libzbar.dylib",
-        "/usr/local/opt/zbar/lib/libzbar.dylib",
-        "/usr/lib/libzbar.so",
-        "/usr/lib/x86_64-linux-gnu/libzbar.so",
-        "/usr/lib/x86_64-linux-gnu/libzbar.so.0",
-    ):
-        if _path_exists(candidate):
-            found_path = candidate
-            break
+    found_path = ctypes.util.find_library("zbar")
+    if not found_path:
+        for candidate in (
+            "/opt/homebrew/lib/libzbar.dylib",
+            "/opt/homebrew/opt/zbar/lib/libzbar.dylib",
+            "/usr/local/lib/libzbar.dylib",
+            "/usr/local/opt/zbar/lib/libzbar.dylib",
+            "/usr/lib/libzbar.so",
+            "/usr/lib/x86_64-linux-gnu/libzbar.so",
+            "/usr/lib/x86_64-linux-gnu/libzbar.so.0",
+            "/usr/lib/aarch64-linux-gnu/libzbar.so",
+            "/usr/lib/aarch64-linux-gnu/libzbar.so.0",
+        ):
+            if _path_exists(candidate):
+                found_path = candidate
+                break
 
     try:
         from pyzbar.pyzbar import decode, ZBarSymbol  # noqa: F401

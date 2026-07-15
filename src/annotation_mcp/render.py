@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import atexit
 import io
+import os
 from typing import assert_never
 
 from PIL import ImageDraw
@@ -34,6 +36,13 @@ from annotation_mcp.models import (
     make_timestamp,
 )
 from annotation_mcp.process import _coerce_annotation, _process_annotation
+
+
+def _safe_unlink(path: str) -> None:
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
 
 
 def render_annotations(  # noqa: C901
@@ -136,6 +145,7 @@ def render_annotations(  # noqa: C901
             prefix="annotation-mcp-", suffix=".png", delete=False
         ) as tmp:
             output_path = tmp.name
+        atexit.register(_safe_unlink, output_path)
 
     # Write to disk
     with open(output_path, "wb") as f:  # noqa: PTH123

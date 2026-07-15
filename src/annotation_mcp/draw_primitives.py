@@ -135,14 +135,20 @@ def draw_highlight(
     """
     color_rgba = parse_color(annotation.color)
     r, g, b = color_rgba[:3]
-    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    overlay_draw = ImageDraw.Draw(overlay)
-    overlay_draw.rectangle(
-        [bounds.x1, bounds.y1, bounds.x2, bounds.y2],
-        fill=(r, g, b, int(255 * annotation.opacity)),
+    x1, y1, x2, y2 = bounds.x1, bounds.y1, bounds.x2, bounds.y2
+    rect_w = x2 - x1
+    rect_h = y2 - y1
+    if rect_w <= 0 or rect_h <= 0:
+        return
+    # Create overlay at rectangle size to avoid full-image allocation
+    overlay = Image.new(
+        "RGBA",
+        (rect_w, rect_h),
+        (r, g, b, int(255 * annotation.opacity)),
     )
-    composited = Image.alpha_composite(img.convert("RGBA"), overlay)
-    img.paste(composited, (0, 0))
+    region = img.crop((x1, y1, x2, y2)).convert("RGBA")
+    composited = Image.alpha_composite(region, overlay)
+    img.paste(composited, (x1, y1))
 
 
 def draw_callout(
