@@ -491,11 +491,12 @@ class TestCropRegion:
 
     def test_missing_file_raises(self, tmp_path: Path) -> None:
         out = tmp_path / "o.png"
+        nonexistent = str(tmp_path / "nonexistent_source.png")
         with pytest.raises(CropError, match="not found"):
-            crop_region("/nonexistent/file.png", (0, 0, 100, 100), output_path=str(out))
+            crop_region(nonexistent, (0, 0, 100, 100), output_path=str(out))
         # Also ensure FileNotFoundError is converted to CropError
         try:
-            crop_region("/nonexistent/file.png", (0, 0, 100, 100), output_path=str(out))
+            crop_region(nonexistent, (0, 0, 100, 100), output_path=str(out))
         except CropError:
             pass
         except FileNotFoundError as e:

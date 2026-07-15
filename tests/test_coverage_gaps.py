@@ -53,20 +53,22 @@ class TestImageIOGaps:
         with pytest.raises(ValueError, match="Input path must be absolute"):
             validate_input_path("relative/path.png")
 
-    def test_validate_input_path_nonexistent_raises(self) -> None:
+    def test_validate_input_path_nonexistent_raises(self, tmp_path) -> None:
         """Given nonexistent path, when validated, then raises FileNotFoundError."""
+        nonexistent = str(tmp_path / "nonexistent_file.png")
         with pytest.raises(FileNotFoundError, match="Input file not found"):
-            validate_input_path("/nonexistent/file.png")
+            validate_input_path(nonexistent)
 
     def test_validate_output_path_relative_raises(self) -> None:
         """Given relative output path, when validated, then raises ValueError."""
         with pytest.raises(ValueError, match="Output path must be absolute"):
             validate_output_path("relative/output.png")
 
-    def test_validate_output_path_bad_parent_raises(self) -> None:
+    def test_validate_output_path_bad_parent_raises(self, tmp_path) -> None:
         """Given output path with nonexistent parent, when validated, then raises ValueError."""
+        bad_output = str(tmp_path / "nonexistent_subdir" / "output.png")
         with pytest.raises(ValueError, match="Output directory does not exist"):
-            validate_output_path("/nonexistent/dir/output.png")
+            validate_output_path(bad_output)
 
     def test_encode_png_returns_png_bytes(self) -> None:
         """Given PIL Image, when encoded, then returns valid PNG bytes."""
