@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel in-progress runs for the same branch on new pushes
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      # ─── System dependencies (tesseract + zbar) ───
+      # Linux: tesseract + libzbar0 + eng language pack
+      # macOS: tesseract + zbar via Homebrew
+      # Windows: tesseract via choco, libzbar0 via vcpkg (see below)
+      - name: Install system dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            tesseract-ocr \
+            tesseract-ocr-eng \
+            tesseract-ocr-rus \
+            libzbar0 \
+            zbar-tools
+
+      - name: Install system dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew update
+          brew install tesseract tesseract-lang zbar
+
+      - name: Install system dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        # tesseract is available via choco; pyzbar ships its own libzbar0
+        # bundled, so on Windows we don't need a separate zbar install.
+        # tesseract-ocr is portable — we install it to C:\tesseract and
+        # add it to PATH so pytesseract can find it.
+        shell: pwsh
+        run: |
+          choco install --no-progress tesseract --installargs 'ADDSTARTUPSEARCH=0 ADDLOCAL=ALL' -y
+          echo "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Verify
+          tesseract --version
+
+      - name: Set up Python
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install Python dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Verify tooling
+        shell: bash
+        run: |
+          uv run python -c "import annotation_mcp; print('import ok')"
+          uv run python -c "import tesseract; print('tesseract ok')" 2>/dev/null || true
+          which tesseract && tesseract --version
+          # Check zbar (pyzbar bundles the lib on Windows/macOS; on Linux
+          # we need libzbar0 which is installed above)
+          uv run python -c "from pyzbar.pyzbar import decode; print('pyzbar ok')"
+
+      - name: Run tests
+        run: |
+          uv run pytest -v --tb=short \
+            --ignore=tests/test_heic_support.py
+
+      - name: Run HEIC tests
+        if: matrix.os == 'macos-latest'
+        # HEIC tests need a real iPhone HEIC file. Only run on macOS where
+        # the test fixture can be located in ~/Pictures; on CI without
+        # the file, the tests skip cleanly.
+        run: |
+          uv run pytest -v tests/test_heic_support.py --tb=short
+        continue-on-error: true  # tests skip without HEIC file, that's OK
+
+      - name: Type check
+        run: uv run basedpyright src/
+
+      - name: Lint
+        run: uv run ruff check src/ tests/
+
+      - name: Coverage report
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          uv run pytest --cov=annotation_mcp --cov-report=xml --cov-report=term
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
